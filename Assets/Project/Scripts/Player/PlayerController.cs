@@ -41,7 +41,10 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private GameObject ballObject;
     [SerializeField] private float ballMoveSpeed = 20f;
     [SerializeField] private KeyCode ballToggleKey = KeyCode.LeftShift;
-    
+
+    [Header("Sprint")]
+    [SerializeField] private float sprintMultiplier = 1.5f; 
+    public bool IsRunning { get; private set; } 
 
     [Header("HyperRoll Dash")]
     public float dashForce = 50f;
@@ -60,6 +63,10 @@ public class PlayerController : MonoBehaviour
 
     private Rigidbody ballRb;
     private Vector3 velocity;
+
+    public float VerticalVelocity => velocity.y;
+    public bool IsGrounded => controller.isGrounded;
+
     private int jumpCount;
     private float pitch;
     private bool isTransforming = false;
@@ -148,18 +155,17 @@ public class PlayerController : MonoBehaviour
         Vector3 inputDirection = new Vector3(horizontal, 0f, vertical).normalized;
         CurrentMoveAmount = inputDirection.magnitude;
 
-        if (inputDirection.magnitude > 0.1f)
-        {
-            velocity.x = 0;
-            velocity.z = 0;
-        }
+        IsRunning = Input.GetKey(KeyCode.LeftControl) && CurrentMoveAmount > 0;
+        float currentSpeed = IsRunning ? moveSpeed * sprintMultiplier : moveSpeed;
+        
 
         Vector3 moveDirection = (playerCamera.forward * vertical + playerCamera.right * horizontal);
         moveDirection.y = 0;
         moveDirection.Normalize();
 
-        controller.Move(moveDirection * moveSpeed * Time.deltaTime);
-        if (modelTransform != null)
+        controller.Move(moveDirection * currentSpeed * Time.deltaTime);
+
+        if (modelTransform != null && inputDirection.magnitude > 0.1f)
         {
             Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
             modelTransform.rotation = Quaternion.Slerp(modelTransform.rotation, targetRotation, rotationSmoothSpeed * Time.deltaTime);
@@ -193,13 +199,17 @@ public class PlayerController : MonoBehaviour
             else if (jumpCount < maxJumps)
             {
                 velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
-                if (jumpCount == 0) animationController?.PlayJump();
 
-                if (jumpVFXSystem != null)
+                if (jumpCount == 0)
                 {
-                    jumpVFXSystem.Play(true);
+                    animationController?.PlayJump(); 
+                }
+                else
+                {
+                    animationController?.PlayDoubleJump();
                 }
 
+                if (jumpVFXSystem != null) jumpVFXSystem.Play(true);
                 jumpCount++;
             }
         }
