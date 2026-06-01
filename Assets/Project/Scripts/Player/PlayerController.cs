@@ -1,6 +1,6 @@
 using UnityEngine;
 using System.Collections;
-
+using UnityEngine.UI;
 public class PlayerController : MonoBehaviour
 {
     [Header("References")]
@@ -52,6 +52,22 @@ public class PlayerController : MonoBehaviour
     private float dashTimer;
     public bool isDashing = false;
 
+    [Header("Ball Boost System")]
+    [SerializeField] private KeyCode boostKey = KeyCode.F; 
+    [SerializeField] private float ballBoostSpeed = 25f;   
+    [SerializeField] private float maxBoostEnergy = 100f;  
+    [SerializeField] private float boostDrainSpeed = 20f;  
+    [SerializeField] private float boostRechargeSpeed = 20f;
+
+    [Header("Boost UI Visuals")]
+    [SerializeField] private UnityEngine.UI.Image boostScreenTint; 
+    [SerializeField] private Color boostColorTint = new Color(1f, 0f, 0f, 0.15f);
+    [SerializeField] private Slider boostSlider;
+
+    private float currentBoostEnergy;
+    private bool isBoosting = false;
+    private bool canStartBoost = true;
+
     [Header("Transformation Effects")]
     [SerializeField] private ParticleSystem transformationEffect;
     [SerializeField] private float visualDelay = 0.15f;
@@ -59,7 +75,10 @@ public class PlayerController : MonoBehaviour
     [Header("VFX")]
     [SerializeField] private ParticleSystem ballTrailSystem;
     [SerializeField] private GameObject trailRendererObject;
-    [SerializeField] private ParticleSystem jumpVFXSystem; 
+    [SerializeField] private ParticleSystem jumpVFXSystem;
+
+
+    
 
     private Rigidbody ballRb;
     private Vector3 velocity;
@@ -94,6 +113,13 @@ public class PlayerController : MonoBehaviour
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
         climbTimer = maxClimbTime;
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+        climbTimer = maxClimbTime;
+
+        currentBoostEnergy = maxBoostEnergy;
+        if (boostScreenTint != null) boostScreenTint.gameObject.SetActive(false);
     }
 
     private void Update()
@@ -105,10 +131,14 @@ public class PlayerController : MonoBehaviour
 
         HandleMouseLook();
 
+        HandleBoostEnergy();
+
         if (IsBallMode)
         {
             HandleBallMovement();
             HandleDash();
+            
+
             if (Input.GetButtonDown("Jump"))
             {
                 if (Mathf.Abs(ballRb.linearVelocity.y) < 0.1f)
@@ -126,6 +156,11 @@ public class PlayerController : MonoBehaviour
                 HandleGravity();
             }
             HandleJump();
+        }
+        else
+        {
+            if (boostScreenTint != null) boostScreenTint.gameObject.SetActive(false);
+            isBoosting = false;
         }
     }
 
@@ -228,7 +263,6 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator ToggleBallModeRoutine()
     {
-
         PlayerStats stats = GetComponent<PlayerStats>();
         if (stats != null && !stats.hasHyperRoll && !IsBallMode)
         {
@@ -247,30 +281,42 @@ public class PlayerController : MonoBehaviour
 
         if (IsBallMode)
         {
-            // AKTIVACE VFX
             if (ballTrailSystem != null) ballTrailSystem.Play();
             if (trailRendererObject != null)
             {
                 trailRendererObject.SetActive(true);
-                // Vymaûe starou Ë·ru, aby se net·hla z minula
                 var tr = trailRendererObject.GetComponent<TrailRenderer>();
                 if (tr != null) tr.Clear();
             }
 
             humanVisuals.SetActive(false);
             controller.enabled = false;
+
+            ballObject.transform.SetParent(null);
+
+            if (ballRb != null)
+            {
+                ballRb.linearVelocity = Vector3.zero;
+                ballRb.angularVelocity = Vector3.zero;
+            }
+
             ballObject.transform.position = transform.position + Vector3.up * 0.5f;
             ballObject.SetActive(true);
         }
         else
         {
-            // DEAKTIVACE VFX
             if (ballTrailSystem != null) ballTrailSystem.Stop();
             if (trailRendererObject != null) trailRendererObject.SetActive(false);
 
             yield return new WaitForSeconds(visualDelay);
+
             transform.position = ballObject.transform.position;
+
             ballObject.SetActive(false);
+
+            ballObject.transform.SetParent(transform);
+            ballObject.transform.localPosition = Vector3.zero;
+
             controller.enabled = true;
             humanVisuals.SetActive(true);
         }
@@ -281,19 +327,65 @@ public class PlayerController : MonoBehaviour
     {
         if (IsBallMode && Input.GetMouseButtonDown(0) && Time.time > dashTimer)
         {
-            Rigidbody rb = GetComponentInChildren<Rigidbody>(); // Najde RB koule
+            Rigidbody rb = GetComponentInChildren<Rigidbody>(); 
             if (rb != null)
             {
-                // Odp·lÌ kouli smÏrem, kam se dÌv· kamera nebo kam se h˝beö
                 Vector3 dashDir = playerCamera.forward;
                 rb.AddForce(dashDir * dashForce, ForceMode.Impulse);
 
                 isDashing = true;
                 dashTimer = Time.time + dashCooldown;
 
-                // Po malÈ chvÌli vypneme isDashing stav
                 Invoke("ResetDash", 0.5f);
             }
+        }
+    }
+    private void HandleBoostEnergy()
+    {
+        if (currentBoostEnergy >= maxBoostEnergy)
+        {
+            canStartBoost = true;
+        }
+
+        if (IsBallMode && Input.GetKey(boostKey) && canStartBoost)
+        {
+            isBoosting = true;
+            currentBoostEnergy -= boostDrainSpeed * Time.deltaTime;
+
+            if (boostScreenTint != null)
+            {
+                boostScreenTint.gameObject.SetActive(true);
+                boostScreenTint.color = boostColorTint;
+            }
+
+            if (currentBoostEnergy <= 0)
+            {
+                canStartBoost = false;
+            }
+        }
+        else
+        {
+            if (isBoosting)
+            {
+                canStartBoost = false; 
+            }
+
+            isBoosting = false;
+
+            if (currentBoostEnergy < maxBoostEnergy)
+            {
+                currentBoostEnergy += boostRechargeSpeed * Time.deltaTime;
+            }
+
+            if (boostScreenTint != null) boostScreenTint.gameObject.SetActive(false);
+        }
+
+        currentBoostEnergy = Mathf.Clamp(currentBoostEnergy, 0f, maxBoostEnergy);
+
+        if (boostSlider != null)
+        {
+            boostSlider.gameObject.SetActive(IsBallMode);
+            boostSlider.value = currentBoostEnergy / maxBoostEnergy;
         }
     }
 
@@ -302,9 +394,23 @@ public class PlayerController : MonoBehaviour
     private void HandleBallMovement()
     {
         transform.position = ballObject.transform.position;
+
         Vector3 moveDirection = (playerCamera.forward * Input.GetAxisRaw("Vertical") + playerCamera.right * Input.GetAxisRaw("Horizontal"));
         moveDirection.y = 0;
-        if (ballRb != null) ballRb.AddForce(moveDirection.normalized * ballMoveSpeed * Time.deltaTime, ForceMode.VelocityChange);
+        moveDirection.Normalize();
+
+        if (ballRb != null)
+        {
+            float currentMaxSpeed = isBoosting ? ballBoostSpeed : ballMoveSpeed;
+
+            Vector3 targetVelocity = moveDirection * currentMaxSpeed;
+
+            float responsiveness = 15f;
+            float newX = Mathf.Lerp(ballRb.linearVelocity.x, targetVelocity.x, responsiveness * Time.deltaTime);
+            float newZ = Mathf.Lerp(ballRb.linearVelocity.z, targetVelocity.z, responsiveness * Time.deltaTime);
+
+            ballRb.linearVelocity = new Vector3(newX, ballRb.linearVelocity.y, newZ);
+        }
     }
 
     private void HandleMouseLook()

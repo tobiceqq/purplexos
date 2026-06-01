@@ -1,10 +1,12 @@
 using UnityEngine;
 using TMPro; 
 
+
 public class PlayerStats : MonoBehaviour
 {
     public int energy;
     public bool hasHyperRoll = false;
+    
 
     [Header("UI")]
     public TextMeshProUGUI energyText;

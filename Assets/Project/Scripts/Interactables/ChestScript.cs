@@ -5,21 +5,31 @@ public class ChestScript : MonoBehaviour
     public int energyAmount = 50;
     private bool isOpen = false;
 
-    private void OnTriggerStay(Collider other)
+    private PlayerStats playerInRange;
+
+    private void Update()
     {
-        if (other.CompareTag("Player") && !isOpen && Input.GetKeyDown(KeyCode.E))
+        if (playerInRange != null && !isOpen && Input.GetKeyDown(KeyCode.E))
         {
-            PlayerStats ps = other.GetComponent<PlayerStats>();
-            if (ps != null)
-            {
-                ps.AddEnergy(energyAmount);
-                isOpen = true;
-                Destroy(gameObject, 0.01f);
-            }
+            playerInRange.AddEnergy(energyAmount);
+            isOpen = true;
+            Destroy(gameObject, 0.01f);
         }
     }
 
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            playerInRange = other.GetComponent<PlayerStats>();
+        }
+    }
 
-
-
+    private void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            playerInRange = null;
+        }
+    }
 }
