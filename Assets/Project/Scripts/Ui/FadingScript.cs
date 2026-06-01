@@ -12,6 +12,7 @@ public class FadingScript : MonoBehaviour
         if (fadeIn)
         {
             FadeIn();
+            
         }
         else
         {
